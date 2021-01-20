@@ -176,8 +176,7 @@ def _make_denoiser(denoising_strategy):
             raise ValueError('Provided denoising strategy is not recognized.')
     return denoiser
     
-def _mask_and_save(masker, img_name, output_dir, regressor_file=None,
-                   denoising_strategy=None, as_voxels=False,
+def _mask_and_save(masker, denoiser, img_name, output_dir, regressor_file=None,
                    labels=None, discard_scans=None):
     """Runs the full masking process and saves output for a single image;
     the main function used by `make_timeseries`
