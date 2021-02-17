@@ -80,6 +80,16 @@ def _cli_parser():
                              'file. If no regressor names are provided, but '
                              'files are, all regressors in regressor files '
                              'are used.')
+    parser.add_argument('--denoising_strategy', nargs='+',type=str,
+                        metavar='denoising_strategy',
+                        help='The denoising strategy to use for confound '
+                             'regression. Applies to all regressor files. '
+                             'The denoising strategy must be either one predefined by '
+                             'load_confounds or a list compatible with load_confounds flexible '
+                             'denoising strategy options. See the documentation '
+                             ' https://github.com/SIMEXP/load_confounds. If no denoising strategy is provided, '
+                             'but files are, all regressors in regressor files '
+                             'are used.')
     parser.add_argument('--as_voxels', default=False,
                         action='store_true',
                         help='Whether to extract out the timeseries of each '
@@ -137,7 +147,6 @@ def _check_glob(x):
         raise ValueError('Input data files (NIfTIs and confounds) must be a'
                          'string or list of string')
 
-
 def _empty_to_None(x):
     """Replace an empty list from params with None"""
     if isinstance(x, list):
@@ -145,12 +154,12 @@ def _empty_to_None(x):
             x = None
     return x
 
-
 def _check_params(params):
     """Ensure that required fields are included and correctly formatted"""
 
     # convert empty list parameters to None 
     params['labels'] = _empty_to_None(params['labels'])
+    params['denoising_strategy'] = _empty_to_None(params['denoising_strategy'])
     params['regressor_names'] = _empty_to_None(params['regressor_names'])
     params['regressor_files'] = _empty_to_None(params['regressor_files'])
 
@@ -194,7 +203,6 @@ def _merge_params(cli, config):
     params = dict(list(cli.items()) + list(config.items()))
     return params
 
-
 def main():
     """Primary entrypoint in program"""
     params = vars(_cli_parser())
@@ -223,7 +231,7 @@ def main():
         'scikit-learn': sklearn.__version__,
         'nilearn': nilearn.__version__,
         'nibabel': nibabel.__version__,
-        'natsort': natsort.__version__
+        'natsort': natsort.__version__,
     }
 
     # export command-line call and parameters to a file
