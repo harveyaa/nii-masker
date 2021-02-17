@@ -31,13 +31,15 @@
       <li>Allow overlapping spheres: {{ parameters["parameters"]["allow_overlap"]}}</li>
       {% if regressor_file is not none %}
         <li>Regressor file: {{ regressor_file }} </li>
-        <li>Nuissance and motion regressors:
-          <ul>
-            {% for i in parameters["parameters"]["regressor_names"] %}
-              <li>{{ i }}</li>
-            {% endfor %}
-          </ul>
-        </li>
+        {% if regressor_names is not none %}
+            <li>Nuissance and motion regressors:
+              <ul>
+                {% for i in parameters["parameters"]["regressor_names"] %}
+                  <li>{{ i }}</li>
+                {% endfor %}
+              </ul>
+            </li>
+        {%endif %}
       {%endif %}
     </ul> 
 

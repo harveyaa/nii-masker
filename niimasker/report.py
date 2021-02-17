@@ -19,7 +19,7 @@ def generate_report(func_image, output_dir):
     func_img_name = os.path.basename(func_image.fname).split('.')[0]
     fig_fname_base = pjoin(fig_dir, func_img_name)
     
-    n_rois = func_image.data.shape[1]
+    n_rois = func_image.timeseries.shape[1]
 
     connectome_fig = None
     reg_corr_fig = None
@@ -30,7 +30,7 @@ def generate_report(func_image, output_dir):
 
         overlay_fig = plot_region_overlay(func_image.roi_img, func_image.img,
                                           fig_fname_base, cmap=roi_cmap)
-        ts_fig = plot_timeseries(func_image.data, fig_fname_base, roi_cmap, 
+        ts_fig = plot_timeseries(func_image.timeseries, fig_fname_base, roi_cmap, 
                                  ylabel)
 
     else:
@@ -40,14 +40,14 @@ def generate_report(func_image, output_dir):
 
         overlay_fig = plot_region_overlay(func_image.roi_img, func_image.img,
                                             fig_fname_base, cmap=roi_cmap)
-        ts_fig = plot_timeseries(func_image.data, fig_fname_base, roi_cmap, 
+        ts_fig = plot_timeseries(func_image.timeseries, fig_fname_base, roi_cmap, 
                                     ylabel)
 
         if n_rois > 1:
-            connectome_fig = plot_connectome(func_image.data, fig_fname_base,
+            connectome_fig = plot_connectome(func_image.timeseries, fig_fname_base,
                                              tick_cmap=roi_cmap)
             if func_image.regressors is not None:
-                reg_corr_fig = plot_regressor_corr(func_image.data,
+                reg_corr_fig = plot_regressor_corr(func_image.timeseries,
                                                    func_image.regressors,
                                                    fig_fname_base, 
                                                    cmap=roi_cmap)
@@ -65,6 +65,7 @@ def generate_report(func_image, output_dir):
                              func_img=func_image.fname,
                              masker_type=func_image.masker_type,
                              regressor_file=func_image.regressor_file,
+                             regressor_names=parameters['parameters']['regressor_names'],
                              overlay_fig=overlay_fig,
                              timeseries_fig=ts_fig,
                              connectome_fig=connectome_fig,
