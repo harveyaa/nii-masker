@@ -34,7 +34,8 @@ setup(
         'scikit-learn',
         'matplotlib',
         'jinja2',
-        'load_confounds'
+        'load_confounds',
+        'pydra'
     ],
     tests_require=test_deps,
     extras_require=extras,

@@ -15,7 +15,6 @@ from nilearn.input_data import (NiftiMasker, NiftiLabelsMasker,NiftiSpheresMaske
 from nilearn.input_data.nifti_spheres_masker import _apply_mask_and_get_affinity
 from niimasker.report import generate_report
 
-
 def _load_from_strategy(denoiser, fname):
     """Verifies if load_confounds strategy is useable given the regressor files.
     load_confounds will raise it's own exception, but add an additional 
@@ -29,7 +28,6 @@ def _load_from_strategy(denoiser, fname):
         return pd.DataFrame(confounds, columns=denoiser.columns_)
     except ValueError as e:
         raise ValueError(error_msg) from e
-
 
 class FunctionalImage(object):
     def __init__(self, fname):
@@ -49,56 +47,56 @@ class FunctionalImage(object):
                     'AnatCompCor', 'TempCompCor'] 
         flexible_strategies = ['motion', 'high_pass', 'wm_csf', 'compcor', 
                                'global']
+        if regressor_fname:
+            if regressor_input is None:
+                # use all regressors from file
+                regressors = pd.read_csv(regressor_fname, sep=r'\t')
+            elif len(regressor_input) == 1 and (regressor_input[0] in strategies):
+                # predefined strategy
+                denoiser = eval('load_confounds.{}()'.format(regressor_input[0]))
+                regressors = _load_from_strategy(denoiser, regressor_fname)
+            elif set(regressor_input) <= set(flexible_strategies):
+                # flexible strategy
+                denoiser = load_confounds.Confounds(strategy=regressor_input)
+                regressors = _load_from_strategy(denoiser, regressor_fname)
+            elif all([x not in strategies + flexible_strategies 
+                      for x in regressor_input]):
+                # list of regressor names
+                try:
+                    regressors = pd.read_csv(regressor_fname, sep='\t', 
+                                             usecols=regressor_input)
+                except ValueError as e:
+                    msg = 'Not all regressors are found in regressor file'
+                    raise ValueError(msg) from e
+            else:
+                raise ValueError('Invalid regressors. Regressors must be a list of '
+                                 'column names that appear in regressor_files, OR a '
+                                 'defined load_confounds regressor strategy (flexible '
+                                 'or non-flexible).')
 
-        if regressor_input is None:
-            # use all regressors from file
-            regressors = pd.read_csv(regressor_fname, sep=r'\t')
-        elif len(regressor_input) == 1 and (regressor_input[0] in strategies):
-            # predefined strategy
-            denoiser = eval('load_confounds.{}()'.format(regressor_input[0]))
-            regressors = _load_from_strategy(denoiser, regressor_fname)
-        elif set(regressor_input) <= set(flexible_strategies):
-            # flexible strategy
-            denoiser = load_confounds.Confounds(strategy=regressor_input)
-            regressors = _load_from_strategy(denoiser, regressor_fname)
-        elif all([x not in strategies + flexible_strategies 
-                  for x in regressor_input]):
-            # list of regressor names
-            try:
-                regressors = pd.read_csv(regressor_fname, sep='\t', 
-                                         usecols=regressor_input)
-            except ValueError as e:
-                msg = 'Not all regressors are found in regressor file'
-                raise ValueError(msg) from e
-        else:
-            raise ValueError('Invalid regressors. Regressors must be a list of '
-                             'column names that appear in regressor_files, OR a '
-                             'defined load_confounds regressor strategy (flexible '
-                             'or non-flexible).')
-
-        self.regressor_file = regressor_fname
-        self.regressors = regressors
-
+            self.regressor_file = regressor_fname
+            self.regressors = regressors
+            
+        elif (regressor_file is None) and regressor_input:
+            warnings.warn('Regressors are provided without regressor_file. No '
+                      'confound regression can be done')
 
     def discard_scans(self, n_scans):
-        # crop scans from image
-        arr = self.img.get_data()
-        arr = arr[:, :, :, n_scans:]
-        self.img = nib.Nifti1Image(arr, self.img.affine)
+        if n_scans is not None: 
+            if n_scans > 0: 
+                # crop scans from image
+                arr = self.img.get_data()
+                arr = arr[:, :, :, n_scans:]
+                self.img = nib.Nifti1Image(arr, self.img.affine)
 
-        if self.regressors is not None:
-            # crop from regressors
-            self.regressors = self.regressors.iloc[n_scans:, :]
-
+                if self.regressors is not None:
+                    # crop from regressors
+                    self.regressors = self.regressors.iloc[n_scans:, :]
 
     def extract(self, masker, as_voxels=False, labels=None):
         print('  Extracting from {}'.format(os.path.basename(self.fname)))
         
-        if self.regressors is None:
-            timeseries = masker.fit_transform(self.img)
-        else:
-            timeseries = masker.fit_transform(self.img,
-                                              confounds=self.regressors.values)
+        timeseries = masker.fit_transform(self.img,confounds=self.regressors.values)
 
         # determine column names for timeseries
         if isinstance(masker, NiftiMasker):
@@ -120,7 +118,7 @@ class FunctionalImage(object):
             self.masker_type = 'NiftiSpheresMasker'
 
         self.masker = masker
-        self.data = pd.DataFrame(timeseries, columns=[str(i) for i in labels])
+        self.timeseries = pd.DataFrame(timeseries, columns=[str(i) for i in labels])
 
 
 ## MASKING FUNCTIONS
@@ -148,76 +146,71 @@ def _get_spheres_from_masker(masker, img):
     
     if masker.mask_img is not None:
         mask_img_ = resample_to_img(masker.mask_img, spheres_img)
-        spheres_img = math_img('img1 * img2', img1=spheres_img, 
-                               img2=mask_img_)
+        spheres_img = math_img('img1 * img2', img1=spheres_img, img2=mask_img_)
 
     return spheres_img
 
 
 def _read_coords(roi_file):
     """Parse and validate coordinates from file"""
-
     if not roi_file.endswith('.tsv'):
         raise ValueError('Coordinate file must be a tab-separated .tsv file')
-
     coords = pd.read_table(roi_file)
     
     # validate columns
     columns = [x for x in coords.columns if x in ['x', 'y', 'z']]
     if (len(columns) != 3) or (len(np.unique(columns)) != 3):
-        raise ValueError('Provided coordinates do not have 3 columns with '
-                         'names `x`, `y`, and `z`')
+        raise ValueError('Provided coordinates do not have 3 columns with names `x`, `y`, and `z`')
 
     # convert to list of lists for nilearn input
     return coords.values.tolist()
+                
+def _masker_from_coords(roi,input_files,output_dir,**kwargs):
+    #makes a new mask from the coords and save it
+    n_rois = len(roi)
+    print('{} region(s) detected from coordinates'.format(n_rois))
 
+    if kwargs.get('radius') is None:
+        warnings.warn('No radius specified for coordinates; setting to nilearn.input_data.NiftiSphereMasker default of extracting from a single voxel')
 
-def _set_masker(roi_file, as_voxels=False, **kwargs):
+    masker = NiftiSpheresMasker(roi, **kwargs)
+    
+    # create and save spheres image if coordinates are provided
+    masker.spheres_img = _get_spheres_from_masker(masker, input_files[0])
+    masker.spheres_img.to_filename(os.path.join(output_dir, 'niimasker_data','spheres_image.nii.gz'))
+    return masker
+
+def _set_masker(roi_file, input_files, output_dir, as_voxels=False, **kwargs):
     """Check and see if multiple ROIs exist in atlas file"""
+    # 1) NIfTI image that is an atlas
+    # 2) query string formatted as `nilearn:<atlas-name>:<atlas-parameters>
+    # 3) a file path to a .tsv file that contains roi_file coordinates in MNI space
 
-    if isinstance(roi_file, str) and roi_file.endswith('.tsv'):
-        roi = _read_coords(roi_file)
-        n_rois = len(roi)
-        is_coords = True
-        print('  {} region(s) detected from coordinates'.format(n_rois))
+    # OPTION 3
+    if roi_file.endswith('.tsv'):
+        masker = _masker_from_coords(roi,input_files,output_dir,**kwargs)
+
+    # OPTION 1 & 2
     else:
         roi = load_img(roi_file)
         n_rois = len(np.unique(roi.get_data())) - 1
-
-        is_coords = False
-        print('  {} region(s) detected from {}'.format(n_rois,
-                                                       roi.get_filename()))
-    
-    if is_coords:
-        if kwargs.get('radius') is None:
-            warnings.warn('No radius specified for coordinates; setting '
-                            'to nilearn.input_data.NiftiSphereMasker default '
-                            'of extracting from a single voxel')
-        masker = NiftiSpheresMasker(roi, **kwargs)
-    else:
+        print('  {} region(s) detected from {}'.format(n_rois,roi.get_filename()))
 
         if 'radius' in kwargs:
             kwargs.pop('radius')
-        
         if 'allow_overlap' in kwargs:
             kwargs.pop('allow_overlap')
-        
-        if n_rois > 1:
-            masker = NiftiLabelsMasker(roi, **kwargs)
-        elif n_rois == 1:
-            # single binary ROI mask 
-            if as_voxels:
-                if 'mask_img' in kwargs:
-                    kwargs.pop('mask_img')
-                masker = NiftiMasker(roi, **kwargs)
-            else:
-                # more computationally efficient if only wanting the mean of ROI
-                masker = NiftiLabelsMasker(roi, **kwargs)
-        else:
-            raise ValueError('No ROI detected; check ROI file')
-    
-    return masker
 
+        if (n_rois == 0):
+            raise ValueError('No ROI detected; check ROI file')
+        elif (n_rois == 1) & as_voxels:
+            if 'mask_img' in kwargs:
+                kwargs.pop('mask_img')
+            masker = NiftiMasker(roi, **kwargs)
+        else:
+            masker = NiftiLabelsMasker(roi, **kwargs)
+
+    return masker
 
 def _mask_and_save(masker, img_name, output_dir, regressor_file=None, 
                    regressors=None, as_voxels=False, labels=None, 
@@ -226,24 +219,14 @@ def _mask_and_save(masker, img_name, output_dir, regressor_file=None,
     the main function used by `make_timeseries`
     """
     img = FunctionalImage(img_name)
-
-    if regressor_file:
-        img.set_regressors(regressor_file, regressors)
-    elif (regressor_file is None) and regressors:
-        warnings.warn('Regressors are provided without regressor_file. No '
-                      'confound regression can be done')
-
-
-    if discard_scans is not None:
-        if discard_scans > 0:
-            img.discard_scans(discard_scans)
-
+    
+    img.set_regressors(regressor_file, regressors)
+    img.discard_scans(discard_scans)
     img.extract(masker, as_voxels=as_voxels, labels=labels)
 
     # export data and report
     out_fname = os.path.basename(img.fname).split('.')[0] + '_timeseries.tsv'
-    img.data.to_csv(os.path.join(output_dir, out_fname), sep='\t', index=False,
-                    float_format='%.8f')
+    img.timeseries.to_csv(os.path.join(output_dir, out_fname), sep='\t', index=False,float_format='%.8f')
     generate_report(img, output_dir)
 
 
@@ -288,14 +271,7 @@ def make_timeseries(input_files, roi_file, output_dir, labels=None,
     **masker_kwargs
         Keyword arguments for `nilearn.input_data` Masker objects.
     """
-    masker = _set_masker(roi_file, as_voxels, **masker_kwargs)
-
-    # create and save spheres image if coordinates are provided
-    if isinstance(masker, NiftiSpheresMasker):
-        masker.spheres_img = _get_spheres_from_masker(masker, input_files[0])
-        masker.spheres_img.to_filename(os.path.join(output_dir, 
-                                                    'niimasker_data', 
-                                                    'spheres_image.nii.gz'))
+    masker = _set_masker(roi_file, input_files, output_dir,as_voxels, **masker_kwargs)
 
     # set as list of NoneType if no regressor files; makes it easy for
     # iterations
@@ -321,4 +297,3 @@ def make_timeseries(input_files, roi_file, output_dir, labels=None,
         )
         with multiprocessing.Pool(processes=n_jobs) as pool:
             pool.starmap(_mask_and_save, args)
-

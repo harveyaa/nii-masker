@@ -158,7 +158,6 @@ def _check_params(params):
 
     # convert empty list parameters to None 
     params['labels'] = _empty_to_None(params['labels'])
-    print(params['regressor_files'])
     params['regressor_files'] = _empty_to_None(params['regressor_files'])
 
     # coerce to list in case a string is provided by config file
@@ -226,8 +225,7 @@ def main():
 
     # finalize parameters
     os.makedirs(params['output_dir'], exist_ok=True)
-    os.makedirs(os.path.join(params['output_dir'], 'niimasker_data'),
-                exist_ok=True)
+    os.makedirs(os.path.join(params['output_dir'], 'niimasker_data'),exist_ok=True)
     params = _check_params(params)
 
     # add in meta data
@@ -244,8 +242,7 @@ def main():
     }
 
     # export command-line call and parameters to a file
-    param_info = {'command': " ".join(sys.argv), 'parameters': params,
-                  'meta_data': versions}
+    param_info = {'command': " ".join(sys.argv), 'parameters': params,'meta_data': versions}
 
     metadata_path = os.path.join(params['output_dir'], 'niimasker_data')
     param_file = os.path.join(metadata_path, 'parameters.json')
