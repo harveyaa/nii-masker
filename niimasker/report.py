@@ -65,7 +65,7 @@ def generate_report(func_image, output_dir):
                              func_img=func_image.fname,
                              masker_type=func_image.masker_type,
                              regressor_file=func_image.regressor_file,
-                             regressor_names=parameters['parameters']['regressor_names'],
+                             regressors=parameters['parameters']['regressors'],
                              overlay_fig=overlay_fig,
                              timeseries_fig=ts_fig,
                              connectome_fig=connectome_fig,
